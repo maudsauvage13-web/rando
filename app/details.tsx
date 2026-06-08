@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, SafeAreaView, Dimensions, StatusBar } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, SafeAreaView, Dimensions, StatusBar, Platform } from 'react-native';
 import { useApp, getHikePriceInfo } from '../context/AppContext';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -29,6 +29,37 @@ const getNextDays = () => {
   return days;
 };
 
+// Horaires de train fictifs réalistes selon les massifs
+const TRAIN_SCHEDULES: Record<string, { aller: string[]; retour: string[] }> = {
+  'Fontainebleau': {
+    aller: ['07:45 - 08:30 (Direct)', '08:45 - 09:30 (Direct)', '09:45 - 10:30 (1 correspond.)'],
+    retour: ['16:15 - 17:00 (Direct)', '17:15 - 18:00 (Direct)', '18:15 - 19:00 (1 correspond.)']
+  },
+  'Vercors': {
+    aller: ['08:00 - 09:35 (Bus incl.)', '09:15 - 10:50 (Bus incl.)', '10:30 - 12:05 (Bus incl.)'],
+    retour: ['16:30 - 18:05 (Bus incl.)', '17:30 - 19:05 (Bus incl.)', '18:45 - 20:20 (Bus incl.)']
+  },
+  'Chartreuse': {
+    aller: ['08:15 - 09:30 (Bus incl.)', '09:45 - 11:00 (Bus incl.)', '11:15 - 12:30 (Bus incl.)'],
+    retour: ['16:00 - 17:15 (Bus incl.)', '17:30 - 18:45 (Bus incl.)', '19:00 - 20:15 (Bus incl.)']
+  },
+  'Lac d\'Annecy': {
+    aller: ['07:50 - 09:10 (Bus incl.)', '09:00 - 10:20 (Bus incl.)', '10:45 - 12:05 (Bus incl.)'],
+    retour: ['16:15 - 17:35 (Bus incl.)', '17:45 - 19:05 (Bus incl.)', '19:15 - 20:35 (Bus incl.)']
+  },
+  'Chamonix': {
+    aller: ['07:10 - 09:25 (Train + Exp)', '08:40 - 10:55 (Train + Exp)', '10:10 - 12:25 (Train + Exp)'],
+    retour: ['15:45 - 18:00 (Train + Exp)', '17:15 - 19:30 (Train + Exp)', '18:45 - 21:00 (Train + Exp)']
+  }
+};
+
+const getArrivalDateLabel = (startDate: Date, durationDays: number) => {
+  const arrivalDate = new Date(startDate);
+  arrivalDate.setDate(arrivalDate.getDate() + (durationDays - 1));
+  const options: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short' };
+  return new Intl.DateTimeFormat('fr-FR', options).format(arrivalDate);
+};
+
 export default function HikeDetailsScreen() {
   const { id } = useLocalSearchParams();
   const { hikes, userPasses, toggleFavorite, favorites } = useApp();
@@ -40,6 +71,31 @@ export default function HikeDetailsScreen() {
   
   const nextDays = getNextDays();
   const [selectedDate, setSelectedDate] = useState(nextDays[1]); // Par défaut, demain
+
+  // Planifier le transport states
+  const [showTransportConfig, setShowTransportConfig] = useState(false);
+  const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
+  const [isMultiDay, setIsMultiDay] = useState(false);
+  const [durationDays, setDurationDays] = useState(1);
+
+  const [selectedStation, setSelectedStation] = useState(hike.departureStation);
+  const stationOptions = hike.departureStation.includes('Paris')
+    ? ['Paris Gare de Lyon', 'Paris Montparnasse', 'Paris Gare du Nord']
+    : hike.departureStation.includes('Grenoble')
+    ? ['Grenoble Gare', 'Grenoble Universités']
+    : [hike.departureStation, 'Autre gare à proximité'];
+
+  const scheduleData = TRAIN_SCHEDULES[
+    hike.location.includes('Fontainebleau') ? 'Fontainebleau' :
+    hike.location.includes('Vercors') ? 'Vercors' :
+    hike.location.includes('Chartreuse') ? 'Chartreuse' :
+    hike.location.includes('Annecy') ? 'Lac d\'Annecy' : 'Chamonix'
+  ] || TRAIN_SCHEDULES['Fontainebleau'];
+
+  const [selectedAller, setSelectedAller] = useState(scheduleData.aller[0]);
+  const [selectedRetour, setSelectedRetour] = useState(scheduleData.retour[0]);
+
+  const scrollViewRef = React.useRef<ScrollView>(null);
 
   const getDifficultyColor = (diff: string) => {
     switch (diff) {
@@ -70,10 +126,33 @@ export default function HikeDetailsScreen() {
   };
 
   const handlePlanTrajet = () => {
-    router.push({
-      pathname: '/plan-transport' as any,
-      params: { hikeId: hike.id, dateId: selectedDate.id, dateLabel: selectedDate.formatted }
-    });
+    if (!showTransportConfig) {
+      setShowTransportConfig(true);
+      setActiveStep(1);
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 150);
+    } else if (activeStep === 1) {
+      setActiveStep(2);
+    } else if (activeStep === 2) {
+      setActiveStep(3);
+    } else {
+      // Aller sur le récapitulatif
+      router.push({
+        pathname: '/recap' as any,
+        params: {
+          hikeId: hike.id,
+          dateLabel: selectedDate.formatted,
+          departureStation: selectedStation,
+          allerTime: selectedAller,
+          retourTime: selectedRetour,
+          pricePaid: priceInfo.price,
+          co2Saved: hike.co2Saved,
+          isMultiDay: isMultiDay ? 'true' : 'false',
+          durationDays: durationDays.toString()
+        }
+      });
+    }
   };
 
   return (
@@ -119,8 +198,9 @@ export default function HikeDetailsScreen() {
 
       {/* 2. BODY CONTENT (SCROLLABLE) */}
       <ScrollView
+        ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 130 }}
+        contentContainerStyle={{ paddingBottom: 150 }}
         className="flex-1 -mt-8 px-5 rounded-t-[32px] bg-white"
       >
         {/* Category & Rating */}
@@ -300,14 +380,299 @@ export default function HikeDetailsScreen() {
             })}
           </ScrollView>
         </View>
+
+        {/* STEP-BY-STEP COLLAPSIBLE TRANSPORT CONFIGURATION */}
+        <View className="mb-6 pt-4 border-t border-slate-100">
+          <TouchableOpacity 
+            onPress={() => {
+              setShowTransportConfig(!showTransportConfig);
+              if (!showTransportConfig) {
+                setTimeout(() => {
+                  scrollViewRef.current?.scrollToEnd({ animated: true });
+                }, 150);
+              }
+            }}
+            className="flex-row justify-between items-center py-2"
+          >
+            <View className="flex-row items-center">
+              <View className="w-10 h-10 rounded-full bg-orange-100 items-center justify-center mr-3">
+                <SymbolView 
+                  name={{ ios: 'train.side.front.car', android: 'train', web: 'train' }} 
+                  tintColor="#f97316" 
+                  size={20} 
+                />
+              </View>
+              <View>
+                <Text className="text-slate-900 text-lg font-black tracking-tight">Configuration du trajet</Text>
+                <Text className="text-slate-500 text-xs font-semibold">Planifier votre aller-retour sans voiture</Text>
+              </View>
+            </View>
+            <SymbolView 
+              name={{ 
+                ios: showTransportConfig ? 'chevron.up' : 'chevron.down', 
+                android: showTransportConfig ? 'expand_less' : 'expand_more', 
+                web: showTransportConfig ? 'expand_less' : 'expand_more' 
+              }} 
+              tintColor="#0f172a" 
+              size={20} 
+            />
+          </TouchableOpacity>
+
+          {showTransportConfig && (
+            <View className="mt-4 space-y-4">
+              {/* Étape 1 : Dates & Durée */}
+              <View className="bg-slate-50 border border-slate-200/60 rounded-[24px] overflow-hidden mb-3 shadow-sm shadow-slate-900/5">
+                <TouchableOpacity
+                  onPress={() => setActiveStep(1)}
+                  className="p-4 flex-row justify-between items-center bg-slate-50"
+                >
+                  <View className="flex-row items-center">
+                    <View className="w-7 h-7 rounded-full bg-slate-900 items-center justify-center mr-3">
+                      <Text className="text-white font-black text-xs">1</Text>
+                    </View>
+                    <View className="pr-4 flex-1">
+                      <Text className="text-slate-900 font-extrabold text-sm tracking-tight">Durée & Dates</Text>
+                      <Text className="text-slate-500 text-[10px] font-bold" numberOfLines={1}>
+                        {isMultiDay 
+                          ? `Départ : ${selectedDate.dayNum} ${selectedDate.month} • Arrivée : ${getArrivalDateLabel(selectedDate.raw, durationDays)}` 
+                          : `Aller-retour : ${selectedDate.formatted}`}
+                      </Text>
+                    </View>
+                  </View>
+                  <SymbolView
+                    name={{
+                      ios: activeStep === 1 ? 'chevron.up' : 'chevron.down',
+                      android: activeStep === 1 ? 'expand_less' : 'expand_more',
+                      web: activeStep === 1 ? 'expand_less' : 'expand_more'
+                    }}
+                    tintColor="#0f172a"
+                    size={16}
+                  />
+                </TouchableOpacity>
+
+                {activeStep === 1 && (
+                  <View className="p-4 border-t border-slate-200/60 bg-white space-y-4">
+                    <Text className="text-slate-400 text-[10px] font-black uppercase tracking-wider mb-1">Type de trajet</Text>
+                    
+                    <View className="flex-row mb-2">
+                      <TouchableOpacity
+                        onPress={() => { setIsMultiDay(false); setDurationDays(1); }}
+                        className={`flex-1 p-3 rounded-[20px] border items-center mr-2 ${
+                          !isMultiDay ? 'bg-orange-50/50 border-orange-500 shadow-sm' : 'bg-slate-50 border-slate-200/80'
+                        }`}
+                      >
+                        <SymbolView name={{ ios: 'sun.max.fill', android: 'wb_sunny', web: 'wb_sunny' }} tintColor={!isMultiDay ? '#f97316' : '#64748b'} size={20} />
+                        <Text className="text-slate-900 font-extrabold text-xs mt-1">Journée</Text>
+                        <Text className="text-slate-500 text-[9px] font-semibold mt-0.5 text-center">Aller-retour le même jour</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        onPress={() => { setIsMultiDay(true); setDurationDays(2); }}
+                        className={`flex-1 p-3 rounded-[20px] border items-center ${
+                          isMultiDay ? 'bg-orange-50/50 border-orange-500 shadow-sm' : 'bg-slate-50 border-slate-200/80'
+                        }`}
+                      >
+                        <SymbolView name={{ ios: 'moon.stars.fill', android: 'nights_stay', web: 'nights_stay' }} tintColor={isMultiDay ? '#f97316' : '#64748b'} size={20} />
+                        <Text className="text-slate-900 font-extrabold text-xs mt-1">Plusieurs jours</Text>
+                        <Text className="text-slate-500 text-[9px] font-semibold mt-0.5 text-center">Randonnée longue</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {isMultiDay && (
+                      <View className="bg-slate-50 p-3 rounded-[20px] border border-slate-200/60">
+                        <Text className="text-slate-500 text-[10px] font-black uppercase tracking-wider mb-2">Nombre de jours sur place</Text>
+                        <View className="flex-row items-center justify-between">
+                          <TouchableOpacity
+                            onPress={() => setDurationDays((d) => Math.max(2, d - 1))}
+                            className="w-8 h-8 bg-white rounded-full items-center justify-center border border-slate-200 shadow-sm"
+                          >
+                            <Text className="text-slate-800 font-extrabold text-base">-</Text>
+                          </TouchableOpacity>
+                          <Text className="text-slate-900 font-black text-sm">{durationDays} Jours</Text>
+                          <TouchableOpacity
+                            onPress={() => setDurationDays((d) => Math.min(5, d + 1))}
+                            className="w-8 h-8 bg-white rounded-full items-center justify-center border border-slate-200 shadow-sm"
+                          >
+                            <Text className="text-slate-800 font-extrabold text-base">+</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <View className="mt-3 pt-3 border-t border-slate-200/40">
+                          <Text className="text-slate-500 text-[10px] font-bold">
+                            📅 Date de départ : <Text className="text-slate-800 font-extrabold">{selectedDate.formatted}</Text>
+                          </Text>
+                          <Text className="text-slate-500 text-[10px] font-bold mt-1">
+                            📅 Date d'arrivée : <Text className="text-slate-800 font-extrabold">{getArrivalDateLabel(selectedDate.raw, durationDays)}</Text>
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+
+                    <TouchableOpacity
+                      onPress={() => setActiveStep(2)}
+                      className="w-full py-3 bg-slate-900 rounded-[16px] items-center mt-2 shadow-sm"
+                    >
+                      <Text className="text-white font-extrabold text-xs">Continuer</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+
+              {/* Étape 2 : Gare de départ */}
+              <View className="bg-slate-50 border border-slate-200/60 rounded-[24px] overflow-hidden mb-3 shadow-sm shadow-slate-900/5" style={{ opacity: activeStep < 2 ? 0.6 : 1 }}>
+                <TouchableOpacity
+                  onPress={() => activeStep >= 2 && setActiveStep(2)}
+                  disabled={activeStep < 2}
+                  className="p-4 flex-row justify-between items-center bg-slate-50"
+                >
+                  <View className="flex-row items-center">
+                    <View className="w-7 h-7 rounded-full bg-slate-900 items-center justify-center mr-3">
+                      <Text className="text-white font-black text-xs">2</Text>
+                    </View>
+                    <View>
+                      <Text className="text-slate-900 font-extrabold text-sm tracking-tight">Gare de départ</Text>
+                      <Text className="text-slate-500 text-[10px] font-bold">{selectedStation}</Text>
+                    </View>
+                  </View>
+                  {activeStep >= 2 && (
+                    <SymbolView
+                      name={{
+                        ios: activeStep === 2 ? 'chevron.up' : 'chevron.down',
+                        android: activeStep === 2 ? 'expand_less' : 'expand_more',
+                        web: activeStep === 2 ? 'expand_less' : 'expand_more'
+                      }}
+                      tintColor="#0f172a"
+                      size={16}
+                    />
+                  )}
+                </TouchableOpacity>
+
+                {activeStep === 2 && (
+                  <View className="p-4 border-t border-slate-200/60 bg-white space-y-3">
+                    <Text className="text-slate-400 text-[10px] font-black uppercase tracking-wider mb-1">Choisir votre gare de départ</Text>
+                    
+                    <View className="space-y-2">
+                      {stationOptions.map((station) => (
+                        <TouchableOpacity
+                          key={station}
+                          onPress={() => setSelectedStation(station)}
+                          className={`p-3 rounded-[16px] border flex-row justify-between items-center ${
+                            selectedStation === station ? 'bg-orange-50/50 border-orange-500 shadow-sm' : 'bg-slate-50 border-slate-200/60'
+                          }`}
+                        >
+                          <Text className="text-slate-900 font-extrabold text-xs">{station}</Text>
+                          {selectedStation === station && (
+                            <SymbolView name={{ ios: 'checkmark.circle.fill', android: 'check_circle', web: 'check_circle' }} tintColor="#f97316" size={16} />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    <TouchableOpacity
+                      onPress={() => setActiveStep(3)}
+                      className="w-full py-3 bg-slate-900 rounded-[16px] items-center mt-2 shadow-sm"
+                    >
+                      <Text className="text-white font-extrabold text-xs">Continuer</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+
+              {/* Étape 3 : Sélection des horaires */}
+              <View className="bg-slate-50 border border-slate-200/60 rounded-[24px] overflow-hidden mb-3 shadow-sm shadow-slate-900/5" style={{ opacity: activeStep < 3 ? 0.6 : 1 }}>
+                <TouchableOpacity
+                  onPress={() => activeStep >= 3 && setActiveStep(3)}
+                  disabled={activeStep < 3}
+                  className="p-4 flex-row justify-between items-center bg-slate-50"
+                >
+                  <View className="flex-row items-center">
+                    <View className="w-7 h-7 rounded-full bg-slate-900 items-center justify-center mr-3">
+                      <Text className="text-white font-black text-xs">3</Text>
+                    </View>
+                    <View className="pr-4 flex-1">
+                      <Text className="text-slate-900 font-extrabold text-sm tracking-tight">Horaires Aller & Retour</Text>
+                      <Text className="text-slate-500 text-[10px] font-bold" numberOfLines={1}>
+                        Aller: {selectedAller.split(' (')[0]} • Retour: {selectedRetour.split(' (')[0]}
+                      </Text>
+                    </View>
+                  </View>
+                  {activeStep >= 3 && (
+                    <SymbolView
+                      name={{
+                        ios: activeStep === 3 ? 'chevron.up' : 'chevron.down',
+                        android: activeStep === 3 ? 'expand_less' : 'expand_more',
+                        web: activeStep === 3 ? 'expand_less' : 'expand_more'
+                      }}
+                      tintColor="#0f172a"
+                      size={16}
+                    />
+                  )}
+                </TouchableOpacity>
+
+                {activeStep === 3 && (
+                  <View className="p-4 border-t border-slate-200/60 bg-white space-y-4">
+                    {/* Aller */}
+                    <View className="mb-2">
+                      <Text className="text-slate-400 text-[9px] font-black uppercase tracking-wider mb-2">TRAJET ALLER ({selectedDate.formatted})</Text>
+                      {scheduleData.aller.map((t) => (
+                        <TouchableOpacity
+                          key={t}
+                          onPress={() => setSelectedAller(t)}
+                          className={`p-3 rounded-[16px] border flex-row justify-between items-center mb-2 ${
+                            selectedAller === t ? 'bg-orange-50/50 border-orange-500 shadow-sm' : 'bg-slate-50 border-slate-200/50'
+                          }`}
+                        >
+                          <View>
+                            <Text className="text-slate-900 font-extrabold text-xs">{t}</Text>
+                            <Text className="text-slate-500 text-[9px] font-bold mt-0.5">Depuis {selectedStation}</Text>
+                          </View>
+                          <Text className={`text-xs font-black ${priceInfo.isFree ? 'text-emerald-700' : 'text-slate-800'}`}>
+                            {priceInfo.isFree ? 'Gratuit' : `${(priceInfo.price / 2).toFixed(2)}€`}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    {/* Retour */}
+                    <View className="mb-2">
+                      <Text className="text-slate-400 text-[9px] font-black uppercase tracking-wider mb-2">
+                        TRAJET RETOUR ({isMultiDay ? `+ ${durationDays - 1} jours` : selectedDate.formatted})
+                      </Text>
+                      {scheduleData.retour.map((t) => (
+                        <TouchableOpacity
+                          key={t}
+                          onPress={() => setSelectedRetour(t)}
+                          className={`p-3 rounded-[16px] border flex-row justify-between items-center mb-2 ${
+                            selectedRetour === t ? 'bg-orange-50/50 border-orange-500 shadow-sm' : 'bg-slate-50 border-slate-200/50'
+                          }`}
+                        >
+                          <View>
+                            <Text className="text-slate-900 font-extrabold text-xs">{t}</Text>
+                            <Text className="text-slate-500 text-[9px] font-bold mt-0.5">Vers {selectedStation}</Text>
+                          </View>
+                          <Text className={`text-xs font-black ${priceInfo.isFree ? 'text-emerald-700' : 'text-slate-800'}`}>
+                            {priceInfo.isFree ? 'Gratuit' : `${(priceInfo.price / 2).toFixed(2)}€`}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+        </View>
       </ScrollView>
 
       {/* 3. FIXED BOTTOM BAR WITH CTA */}
       <View className="absolute bottom-0 left-0 right-0 bg-white/95 border-t border-slate-100 p-5 backdrop-blur-md flex-row items-center justify-between z-40">
         <View className="flex-1 pr-4">
-          <Text className="text-slate-400 text-[10px] uppercase font-black">Date du trajet</Text>
+          <Text className="text-slate-400 text-[10px] uppercase font-black">
+            {isMultiDay ? 'Aventure multi-jours' : 'Date de départ'}
+          </Text>
           <Text className="text-slate-900 text-sm font-extrabold" numberOfLines={1}>
-            {selectedDate.formatted}
+            {isMultiDay 
+              ? `${selectedDate.dayNum} ${selectedDate.month} ➔ ${getArrivalDateLabel(selectedDate.raw, durationDays)}` 
+              : selectedDate.formatted}
           </Text>
           <Text className="text-slate-500 text-xs mt-0.5 font-medium">
             Tarif pass : <Text className="text-emerald-700 font-extrabold">{priceInfo.displayText}</Text>
@@ -317,7 +682,15 @@ export default function HikeDetailsScreen() {
           onPress={handlePlanTrajet}
           className="bg-slate-900 px-6 py-4.5 rounded-[20px] shadow-sm flex-row items-center"
         >
-          <Text className="text-white font-extrabold text-base mr-2">Planifier le trajet</Text>
+          <Text className="text-white font-extrabold text-base mr-2">
+            {!showTransportConfig 
+              ? 'Configurer le transport' 
+              : activeStep === 1 
+              ? 'Valider les dates' 
+              : activeStep === 2 
+              ? 'Valider la gare' 
+              : 'Confirmer & Réserver'}
+          </Text>
           <SymbolView
             name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }}
             tintColor="#ffffff"
