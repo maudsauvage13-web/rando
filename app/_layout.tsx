@@ -1,8 +1,10 @@
 import { useFonts } from 'expo-font';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { AppProvider, useApp } from '@/context/AppContext';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
+import '../global.css';
 
 import { useColorScheme } from '@/components/useColorScheme';
 
@@ -39,17 +41,42 @@ export default function RootLayout() {
     return null;
   }
 
-  return <RootLayoutNav />;
+  return (
+    <AppProvider>
+      <RootLayoutNav />
+    </AppProvider>
+  );
 }
+
+
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
+  const { onboardingCompleted } = useApp();
+  const router = useRouter();
+  const segments = useSegments();
+
+  useEffect(() => {
+    // Si l'onboarding n'est pas complété, on redirige l'utilisateur vers /onboarding
+    const inOnboarding = (segments[0] as string) === 'onboarding';
+    if (!onboardingCompleted && !inOnboarding) {
+      // Utilisez setTimeout pour s'assurer que la navigation est prête
+      const timer = setTimeout(() => {
+        router.replace('/onboarding' as any);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [onboardingCompleted, segments]);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="search" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="details" options={{ headerShown: false }} />
+        <Stack.Screen name="plan-transport" options={{ headerShown: false }} />
+        <Stack.Screen name="recap" options={{ headerShown: false }} />
       </Stack>
     </ThemeProvider>
   );
