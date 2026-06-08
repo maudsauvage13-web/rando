@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, SafeAreaView, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, SafeAreaView, StatusBar, KeyboardAvoidingView, Platform } from 'react-native';
 import { useApp } from '../context/AppContext';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -108,146 +108,160 @@ export default function OnboardingScreen() {
         </View>
       ) : (
         // Étape 2 : Sélection des abonnements
-        <View className="flex-1 justify-between px-6 py-6">
-          <View className="flex-1">
-            {/* Header */}
-            <View className="flex-row items-center justify-between mb-6">
-              <TouchableOpacity
-                onPress={() => setHasPass(null)}
-                className="w-10 h-10 bg-slate-100 rounded-full items-center justify-center border border-slate-200/40"
-              >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          className="flex-1"
+        >
+          <View className="flex-1 justify-between px-6 py-6">
+            <View className="flex-1">
+              {/* Header */}
+              <View className="flex-row items-center justify-between mb-6">
+                <TouchableOpacity
+                  onPress={() => setHasPass(null)}
+                  className="w-10 h-10 bg-slate-100 rounded-full items-center justify-center border border-slate-200/40"
+                >
+                  <SymbolView
+                    name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }}
+                    tintColor="#0f172a"
+                    size={20}
+                  />
+                </TouchableOpacity>
+                <Text className="text-lg font-black text-slate-900 tracking-tight">Sélectionner vos Pass</Text>
+                <TouchableOpacity onPress={handleSkip}>
+                  <Text className="text-orange-500 font-extrabold">Passer</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Barre de recherche */}
+              <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-[20px] px-4 py-3.5 mb-4">
                 <SymbolView
-                  name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }}
-                  tintColor="#0f172a"
-                  size={20}
+                  name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }}
+                  tintColor="#64748b"
+                  size={18}
+                  style={{ marginRight: 8 }}
                 />
-              </TouchableOpacity>
-              <Text className="text-lg font-black text-slate-900 tracking-tight">Sélectionner vos Pass</Text>
-              <TouchableOpacity onPress={handleSkip}>
-                <Text className="text-orange-500 font-extrabold">Passer</Text>
-              </TouchableOpacity>
-            </View>
+                <TextInput
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Rechercher un abonnement..."
+                  placeholderTextColor="#94a3b8"
+                  className="flex-1 text-slate-800 text-base font-medium"
+                  style={Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : undefined}
+                />
+              </View>
 
-            {/* Barre de recherche */}
-            <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-[20px] px-4 py-3.5 mb-4">
-              <SymbolView
-                name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }}
-                tintColor="#64748b"
-                size={18}
-                style={{ marginRight: 8 }}
-              />
-              <TextInput
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Rechercher un abonnement..."
-                placeholderTextColor="#94a3b8"
-                className="flex-1 text-slate-800 text-base font-medium"
-                style={{ outlineStyle: 'none' } as any}
-              />
-            </View>
+              {/* Catégories de régions (Horizontal scroll) */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                className="mb-4 max-h-[44px]"
+                keyboardShouldPersistTaps="handled"
+              >
+                <TouchableOpacity
+                  onPress={() => setActiveTab('all')}
+                  className={`px-4 py-2 rounded-full mr-2 border ${
+                    activeTab === 'all' ? 'bg-slate-900 border-slate-900' : 'bg-slate-100 border-slate-200/50'
+                  }`}
+                >
+                  <Text className={`font-bold text-xs ${activeTab === 'all' ? 'text-white' : 'text-slate-600'}`}>Tous</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setActiveTab('idf')}
+                  className={`px-4 py-2 rounded-full mr-2 border ${
+                    activeTab === 'idf' ? 'bg-slate-900 border-slate-900' : 'bg-slate-100 border-slate-200/50'
+                  }`}
+                >
+                  <Text className={`font-bold text-xs ${activeTab === 'idf' ? 'text-white' : 'text-slate-600'}`}>Île-de-France</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setActiveTab('aura')}
+                  className={`px-4 py-2 rounded-full mr-2 border ${
+                    activeTab === 'aura' ? 'bg-slate-900 border-slate-900' : 'bg-slate-100 border-slate-200/50'
+                  }`}
+                >
+                  <Text className={`font-bold text-xs ${activeTab === 'aura' ? 'text-white' : 'text-slate-600'}`}>Auvergne-Rhône-Alpes</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setActiveTab('national')}
+                  className={`px-4 py-2 rounded-full border ${
+                    activeTab === 'national' ? 'bg-slate-900 border-slate-900' : 'bg-slate-100 border-slate-200/50'
+                  }`}
+                >
+                  <Text className={`font-bold text-xs ${activeTab === 'national' ? 'text-white' : 'text-slate-600'}`}>National</Text>
+                </TouchableOpacity>
+              </ScrollView>
 
-            {/* Catégories de régions (Horizontal scroll) */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row mb-4 max-h-[44px]">
-              <TouchableOpacity
-                onPress={() => setActiveTab('all')}
-                className={`px-4 py-2 rounded-full mr-2 border ${
-                  activeTab === 'all' ? 'bg-slate-900 border-slate-900' : 'bg-slate-100 border-slate-200/50'
-                }`}
+              {/* Liste des Pass */}
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                className="flex-1 mt-2"
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ paddingBottom: 24 }}
               >
-                <Text className={`font-bold text-xs ${activeTab === 'all' ? 'text-white' : 'text-slate-600'}`}>Tous</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setActiveTab('idf')}
-                className={`px-4 py-2 rounded-full mr-2 border ${
-                  activeTab === 'idf' ? 'bg-slate-900 border-slate-900' : 'bg-slate-100 border-slate-200/50'
-                }`}
-              >
-                <Text className={`font-bold text-xs ${activeTab === 'idf' ? 'text-white' : 'text-slate-600'}`}>Île-de-France</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setActiveTab('aura')}
-                className={`px-4 py-2 rounded-full mr-2 border ${
-                  activeTab === 'aura' ? 'bg-slate-900 border-slate-900' : 'bg-slate-100 border-slate-200/50'
-                }`}
-              >
-                <Text className={`font-bold text-xs ${activeTab === 'aura' ? 'text-white' : 'text-slate-600'}`}>Auvergne-Rhône-Alpes</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setActiveTab('national')}
-                className={`px-4 py-2 rounded-full border ${
-                  activeTab === 'national' ? 'bg-slate-900 border-slate-900' : 'bg-slate-100 border-slate-200/50'
-                }`}
-              >
-                <Text className={`font-bold text-xs ${activeTab === 'national' ? 'text-white' : 'text-slate-600'}`}>National</Text>
-              </TouchableOpacity>
-            </ScrollView>
-
-            {/* Liste des Pass */}
-            <ScrollView showsVerticalScrollIndicator={false} className="flex-1 mt-2">
-              {filteredPasses.length > 0 ? (
-                filteredPasses.map((pass) => {
-                  const isSelected = selectedPasses.includes(pass.id);
-                  return (
-                    <TouchableOpacity
-                      key={pass.id}
-                      onPress={() => handleTogglePass(pass.id)}
-                      className={`p-4.5 rounded-[24px] mb-3 border flex-row items-center justify-between ${
-                        isSelected
-                          ? 'bg-orange-50/50 border-orange-500 shadow-sm'
-                          : 'bg-slate-50 border-slate-200/80'
-                      }`}
-                    >
-                      <View className="flex-1 pr-4">
-                        <View className="flex-row items-center mb-1 flex-wrap">
-                          <Text className="text-slate-900 font-extrabold text-base mr-2">{pass.name}</Text>
-                          <Text className="text-slate-500 text-[10px] px-2 py-0.5 bg-slate-200/60 rounded border border-slate-300 font-bold uppercase tracking-tight">
-                            {pass.region}
-                          </Text>
-                        </View>
-                        <Text className="text-slate-500 text-xs mb-1.5 font-medium">{pass.description}</Text>
-                        <Text className="text-orange-600 text-xs font-bold">{pass.priceInfo}</Text>
-                      </View>
-                      <View
-                        className={`w-6 h-6 rounded-full border items-center justify-center ${
-                          isSelected ? 'bg-orange-500 border-orange-500' : 'border-slate-300 bg-white'
+                {filteredPasses.length > 0 ? (
+                  filteredPasses.map((pass) => {
+                    const isSelected = selectedPasses.includes(pass.id);
+                    return (
+                      <TouchableOpacity
+                        key={pass.id}
+                        onPress={() => handleTogglePass(pass.id)}
+                        className={`p-4.5 rounded-[24px] mb-3 border flex-row items-center justify-between ${
+                          isSelected
+                            ? 'bg-orange-50/50 border-orange-500 shadow-sm'
+                            : 'bg-slate-50 border-slate-200/80'
                         }`}
                       >
-                        {isSelected && (
-                          <SymbolView
-                            name={{ ios: 'checkmark', android: 'check', web: 'check' }}
-                            tintColor="#ffffff"
-                            size={14}
-                          />
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })
-              ) : (
-                <View className="items-center justify-center py-12">
-                  <Text className="text-slate-400 text-center font-medium">Aucun abonnement trouvé pour votre recherche.</Text>
-                </View>
-              )}
-            </ScrollView>
-          </View>
+                        <View className="flex-1 pr-4">
+                          <View className="flex-row items-center mb-1 flex-wrap">
+                            <Text className="text-slate-900 font-extrabold text-base mr-2">{pass.name}</Text>
+                            <Text className="text-slate-500 text-[10px] px-2 py-0.5 bg-slate-200/60 rounded border border-slate-300 font-bold uppercase tracking-tight">
+                              {pass.region}
+                            </Text>
+                          </View>
+                          <Text className="text-slate-500 text-xs mb-1.5 font-medium">{pass.description}</Text>
+                          <Text className="text-orange-600 text-xs font-bold">{pass.priceInfo}</Text>
+                        </View>
+                        <View
+                          className={`w-6 h-6 rounded-full border items-center justify-center ${
+                            isSelected ? 'bg-orange-500 border-orange-500' : 'border-slate-300 bg-white'
+                          }`}
+                        >
+                          {isSelected && (
+                            <SymbolView
+                              name={{ ios: 'checkmark', android: 'check', web: 'check' }}
+                              tintColor="#ffffff"
+                              size={14}
+                            />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })
+                ) : (
+                  <View className="items-center justify-center py-12">
+                    <Text className="text-slate-400 text-center font-medium">Aucun abonnement trouvé pour votre recherche.</Text>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
 
-          {/* Validation */}
-          <View className="pt-4 border-t border-slate-100">
-            <TouchableOpacity
-              onPress={handleFinish}
-              disabled={selectedPasses.length === 0}
-              className={`w-full py-4.5 rounded-[20px] items-center ${
-                selectedPasses.length > 0 ? 'bg-slate-900 shadow-sm' : 'bg-slate-100 opacity-60'
-              }`}
-            >
-              <Text className={`font-extrabold text-base ${selectedPasses.length > 0 ? 'text-white' : 'text-slate-400'}`}>
-                {selectedPasses.length > 0
-                  ? `Valider (${selectedPasses.length} sélectionné${selectedPasses.length > 1 ? 's' : ''})`
-                  : 'Sélectionnez au moins un pass'}
-              </Text>
-            </TouchableOpacity>
+            {/* Validation */}
+            <View className="pt-4 border-t border-slate-100">
+              <TouchableOpacity
+                onPress={handleFinish}
+                className={`w-full py-4.5 rounded-[20px] items-center ${
+                  selectedPasses.length > 0 ? 'bg-slate-900 shadow-sm' : 'bg-slate-800'
+                }`}
+              >
+                <Text className="text-white font-extrabold text-base">
+                  {selectedPasses.length > 0
+                    ? `Valider (${selectedPasses.length} sélectionné${selectedPasses.length > 1 ? 's' : ''})`
+                    : 'Continuer sans pass'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       )}
     </SafeAreaView>
   );

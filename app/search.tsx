@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, SafeAreaView, StatusBar } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, SafeAreaView, StatusBar, KeyboardAvoidingView, Platform } from 'react-native';
 import { useApp, SearchFilters } from '../context/AppContext';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -128,34 +128,42 @@ export default function SearchFiltersScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView className="flex-1 px-5 py-4" showsVerticalScrollIndicator={false}>
-        {/* ÉTAPE 1 : Choix du lieu */}
-        <View className="mb-6">
-          <Text className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Massif ou Lieu</Text>
-          <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-[20px] px-4 py-3.5">
-            <SymbolView
-              name={{ ios: 'mappin.and.ellipse', android: 'place', web: 'place' }}
-              tintColor="#f97316"
-              size={18}
-              style={{ marginRight: 8 }}
-            />
-            <TextInput
-              value={place}
-              onChangeText={(txt) => {
-                setPlace(txt);
-                if (txt.length > 0) setIsPlaceChosen(true);
-              }}
-              placeholder="Où voulez-vous aller ? (ex: Vercors, Chamonix)"
-              placeholderTextColor="#94a3b8"
-              className="flex-1 text-slate-800 text-base font-semibold"
-              style={{ outlineStyle: 'none' } as any}
-            />
-            {place.length > 0 && (
-              <TouchableOpacity onPress={() => { setPlace(''); setIsPlaceChosen(false); }}>
-                <SymbolView name={{ ios: 'xmark.circle.fill', android: 'cancel', web: 'cancel' }} tintColor="#94a3b8" size={18} />
-              </TouchableOpacity>
-            )}
-          </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        className="flex-1"
+      >
+        <ScrollView 
+          className="flex-1 px-5 py-4" 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* ÉTAPE 1 : Choix du lieu */}
+          <View className="mb-6">
+            <Text className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Massif ou Lieu</Text>
+            <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-[20px] px-4 py-3.5">
+              <SymbolView
+                name={{ ios: 'mappin.and.ellipse', android: 'place', web: 'place' }}
+                tintColor="#f97316"
+                size={18}
+                style={{ marginRight: 8 }}
+              />
+              <TextInput
+                value={place}
+                onChangeText={(txt) => {
+                  setPlace(txt);
+                  if (txt.length > 0) setIsPlaceChosen(true);
+                }}
+                placeholder="Où voulez-vous aller ? (ex: Vercors, Chamonix)"
+                placeholderTextColor="#94a3b8"
+                className="flex-1 text-slate-800 text-base font-semibold"
+                style={Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : undefined}
+              />
+              {place.length > 0 && (
+                <TouchableOpacity onPress={() => { setPlace(''); setIsPlaceChosen(false); }}>
+                  <SymbolView name={{ ios: 'xmark.circle.fill', android: 'cancel', web: 'cancel' }} tintColor="#94a3b8" size={18} />
+                </TouchableOpacity>
+              )}
+            </View>
 
           {/* Recommandations rapides de lieux */}
           {!isPlaceChosen && (
@@ -371,6 +379,7 @@ export default function SearchFiltersScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
